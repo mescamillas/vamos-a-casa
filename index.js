@@ -11,13 +11,16 @@ const {Builder, By, Key, until} = require('selenium-webdriver');
           return readyState === 'complete';
         });
       });
-    //driver.actions().mouseDown(canvas).mouseUp(canvas).perform();
-    await driver.actions().mouseMove(element).mouseUp().mouseDown().perform();
-    await driver.executeScript(printCoords);
-    // await driver.wait(until.titleIs('webdriver - Google Search'), 1000);
+      
+      setTimeout(async()=>{
+        const actions = driver.actions();
+        await actions.click(canvas).perform();
+        await driver.executeAsyncScript(printCoords);
+      },10000);
+
   }catch(error){
     console.log(error);
-    // driver.close();
+    driver.close();
   } finally {
   
   };
@@ -26,7 +29,10 @@ const {Builder, By, Key, until} = require('selenium-webdriver');
 
 function printCoords(){
     let car = this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje;
-    while(true){
-        console.log(car.x, car.y);
-    }
+    setTimeout(()=>{
+      console.log(car.x,car.y);
+      arguments[arguments.length - 1];
+      printCoords();
+    },500);
+    
 }
