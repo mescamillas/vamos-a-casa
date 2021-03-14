@@ -1,30 +1,38 @@
-const {Builder, By, Key, until} = require('selenium-webdriver');
+require('chromedriver');
+const {Builder, By, until} = require('selenium-webdriver');
 
 let agentInfo = {};
+let carInterval = true;
 
-(async function example() {
-  let driver = await new Builder().forBrowser('chrome').build();
-  //driver.manage().window().maximize();
+;(async function initialPerception() {
+  let driver = await new Builder()
+  .forBrowser('chrome')
+  .build();
   try {
+    //inicializacion del juego
     await driver.get('https://www.juegosinfantilespum.com/laberintos-online/12-auto-buhos.php');
     await driver.wait(until.elementIsNotVisible(driver.findElement(By.id("_preload_div_"))));
     let canvas = driver.findElement(By.id("canvas"));
     const actions = driver.actions();
     await actions.click(canvas).perform();
-    agentInfo = await driver.executeScript(getStaticElements);
-    console.log(agentInfo.owls);
-    await driver.executeAsyncScript(printCoords);
+
+    //obtener los buhos y casas de cada nivel
+    agentInfo = await driver.executeScript(getOwlsAndHouses);
+
+    //actualizar de las coords del carro cada 200 ms
+    setInterval(async function(){
+      if(carInterval)
+        agentInfo.car = await driver.executeScript(getCarCoordinates);
+      else 
+        clearInterval(this);
+    }, 200);
 
   }catch(error){
-    console.log(error);
-    driver.close();
-  } finally {
-    
-  };
-
+    console.log(error); 
+  }
 })();
 
-function getStaticElements(){
+function getOwlsAndHouses(){
   let game = this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0];
   let houses = [{
       x : game.puerta.x,
@@ -50,11 +58,8 @@ function getStaticElements(){
 }
 
 
-function printCoords(){
+function getCarCoordinates(){
     let car = this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje;
-    setTimeout(()=>{
-      console.log(car.x, car.y);
-      printCoords();
-      arguments[arguments.length - 1];
-    },500);
+    console.log(car.x, car.y);
+    return {x: car.x,y: car.y};
 }
