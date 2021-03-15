@@ -1,6 +1,7 @@
 require('chromedriver');
 const {Builder, By, until} = require('selenium-webdriver');
 
+// objeto global que almacena las coordenadas de buhos, casas y el carro
 let agentInfo = {};
 let carInterval = true;
 
@@ -21,9 +22,10 @@ let carInterval = true;
 
     //actualizar de las coords del carro cada 200 ms
     setInterval(async function(){
-      if(carInterval)
+      if(carInterval){
         agentInfo.car = await driver.executeScript(getCarCoordinates);
-      else 
+        console.log(agentInfo.car);
+      }else 
         clearInterval(this);
     }, 200);
 
@@ -56,7 +58,6 @@ function getOwlsAndHouses(){
   ]];
   return {houses, owls};
 }
-
 
 function getCarCoordinates(){
     let car = this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje;
