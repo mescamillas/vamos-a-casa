@@ -15,7 +15,7 @@ El programa utiliza selenium, una libreria de automatizacion de navegadores
 normalmente utilizado para correr pruebas. Sin embargo, esta libreria permite
 un gran control sobre un navegador de forma programatica.
 
-En esta oportunidad, utilizamos esta libreria para poder obtener informacion del juego
+En esta oportunidad, utilizamos selenium para poder obtener informacion del juego
 por medio de injeccion de codigo. Tambien fue necesario generar una salida inicial en 
 forma de click para iniciar el juego. 
 
@@ -32,4 +32,4 @@ son un arreglo por nivel, cada uno guarda las coordenadas de los buhos correspon
 
 - agentInfo.car contiene las coordenadas del auto en un momento dado. Para demostrar como se actualiza,
 hemos implementado un intervalo el cual cada 200 ms obtiene las coordenadas actuales del carro.
-Sin embargo, esposible que cuando implementemos el agente, ya se utilice un intervalo. 
+Sin embargo, esposible que cuando implementemos el agente, se utilice otro metodo de actualizacion. 
