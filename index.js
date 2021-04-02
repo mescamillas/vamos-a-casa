@@ -19,12 +19,14 @@ let carInterval = true;
 
     //obtener los buhos y casas de cada nivel
     agentInfo = await driver.executeScript(getOwlsAndHouses);
+    console.log(agentInfo.owls);
+    console.log(agentInfo.houses);
 
     //actualizar de las coords del carro cada 200 ms
     setInterval(async function(){
       if(carInterval){
         agentInfo.car = await driver.executeScript(getCarCoordinates);
-        console.log(agentInfo.car);
+        //console.log(agentInfo.car);
       }else 
         clearInterval(this);
     }, 200);
