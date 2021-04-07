@@ -1,12 +1,9 @@
-//	width: 730
-//	height: 367
 require('chromedriver');
-let fs = require('fs');
 const {Builder, By, until,Key} = require('selenium-webdriver');
-const {createFilledMatrix} = require('./matrixOperations.js');
+const {createFilledMatrix, sleep, round, printMatrix} = require('./utility.js');
 console.clear();
 
-//constantes
+//constants
 const WIDTH = 73;
 const HEIGHT = 37;
 
@@ -26,11 +23,16 @@ const MARKER = {
   CAR: 5
 }
 
-//globales
+//globals
 let agentInfo = {};
 let mapMatrix;
 let currentLevel;
-let isLevelStart = true;
+let isLevelStart;
+let orientation;
+let currentSurroundings;
+let previousSurroundings;
+let currentPos;
+let previousPos;
 
 let driver;
 
@@ -38,15 +40,16 @@ let driver;
   try {
     await startGame();
     while(currentLevel < 3){
-      await perceive();
-      await think();
-      await act();
-      printMatrix(mapMatrix, `map${currentLevel}.txt`);
-      currentLevel++;
-      //break;
+      isLevelStart = true;
+      while(currentLevel == await getLevel()){
+        await perceive();
+        await think();
+        await act();
+        await sleep(50);
+      };
+      currentLevel = await getLevel();
     }
-
-
+    await sleep(5000);
   }catch(error){
     console.log("x: ",error); 
     driver.close();
@@ -59,62 +62,22 @@ async function startGame(){
   await startDriver();
   currentLevel = await getLevel();
   agentInfo = await getOwlsAndHouses();
-  agentInfo.car = await getCarCoordinates();
-
 }
 
-async function perceive(){
-  if(isLevelStart){
-    mapMatrix = createFilledMatrix(WIDTH, HEIGHT, MARKER.UNKNOWN);
-    await drawMaze();
-    await drawStaticElements();
-    mapMatrix[agentInfo.car.roundY][agentInfo.car.roundX] = MARKER.CAR;
-    console.log(agentInfo.car)
-    //isLevelStart = false;
-  }
+async function startDriver(){
+  driver = await new Builder()
+  .forBrowser('chrome')
+  .build();
+  //inicializacion del juego
+  await driver.get('https://www.juegosinfantilespum.com/laberintos-online/12-auto-buhos.php');
+  await driver.wait(until.elementIsNotVisible(driver.findElement(By.id("_preload_div_"))));
+  let canvas = driver.findElement(By.id("canvas"));
+  const actions = driver.actions();
+  await actions.click(canvas).perform();
 }
 
-async function think(){
-
-}
-
-async function act(){
-
-}
-
-
-function printMatrix(matrix, filename){
-  var file = fs.createWriteStream(filename);
-  matrix.forEach(value => file.write(`${value}\r\n`));
-  file.end();
-}
-
-async function move(direction, time=50) {
-  //const actions = driver.actions();
-  switch(direction){
-    case DIRECTION.UP:
-      //await driver.actions().keyDown(Key.ARROW_UP).pause(time).keyUp(Key.ARROW_UP).perform();
-      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.y-=10; return});
-      //ORIENT = direction;
-      break;
-    case DIRECTION.DOWN:
-      //await driver.actions().keyDown(Key.ARROW_DOWN).pause(time).keyUp(Key.ARROW_DOWN).perform();
-      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.y+=10; return});
-      //ORIENT = direction;
-      break;
-    case DIRECTION.LEFT:
-      //await driver.actions().keyDown(Key.ARROW_LEFT).pause(time).keyUp(Key.ARROW_LEFT).perform();
-      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.x-=10; return});
-      //ORIENT = direction;
-      break;
-    case DIRECTION.RIGHT:
-      //await driver.actions().keyDown(Key.ARROW_RIGHT).pause(time).keyUp(Key.ARROW_RIGHT).perform();
-      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.x+=10; return});
-      //ORIENT = direction;
-      break;
-  }
-  //await setCar();
-  agentInfo.car = await getCarCoordinates();
+async function getLevel(){
+  return await driver.executeScript(()=>{return exportRoot.currentFrame-1;});
 }
 
 async function getOwlsAndHouses(){
@@ -145,6 +108,28 @@ async function getOwlsAndHouses(){
 
 }
 
+//---- PERCEIVE ----
+
+async function perceive(){
+  if(isLevelStart){
+    agentInfo.car = await getCarCoordinates();
+    mapMatrix = createFilledMatrix(WIDTH, HEIGHT, MARKER.UNKNOWN);
+    await drawMaze();
+    await drawStaticElements();
+    mapMatrix[agentInfo.car.roundY][agentInfo.car.roundX] = MARKER.CAR;
+    currentPos = {x:agentInfo.car.roundX, y: agentInfo.car.roundY};
+    previousPos = {x:agentInfo.car.roundX, y: agentInfo.car.roundY-1};
+    isLevelStart = false;
+  }
+  agentInfo.car = await getCarCoordinates();
+  orientation = await calculateOrientation();
+  previousPos = Object.assign({}, currentPos);
+  previousSurroundings = currentSurroundings;
+  currentSurroundings = await senseSurroundings();
+}
+
+
+
 async function getCarCoordinates(){
   let car = await driver.executeScript(function(){
     let car = this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje;
@@ -154,14 +139,6 @@ async function getCarCoordinates(){
   car.roundX = round(car.x)-1;
   car.roundY = round(car.y)-1;
   return car;
-}
-
-async function getLevel(){
-  return await driver.executeScript(()=>{return exportRoot.currentFrame-1;});
-}
-
-function round(num) {
-  return Math.round(num / 10);
 }
 
 async function drawMaze(){
@@ -230,6 +207,7 @@ async function drawMaze(){
 
 async function drawStaticElements(){
   mapMatrix[round(agentInfo.houses[currentLevel].y)-1][round(agentInfo.houses[currentLevel].x)-1] = MARKER.HOUSE;
+  goal = {x:round(agentInfo.houses[currentLevel].x)-1,y:round(agentInfo.houses[currentLevel].y)-1};
     
   for(let owl of agentInfo.owls[currentLevel]){
     for(let i = round(owl.y)-3; i <= round(owl.y)+1;i++) {
@@ -238,18 +216,181 @@ async function drawStaticElements(){
       mapMatrix[i][round(owl.x)-1] = MARKER.OWL;
       mapMatrix[i][round(owl.x)] = MARKER.OWL;
       mapMatrix[i][round(owl.x)+1] = MARKER.OWL;
+      if(currentLevel == 1)
+      mapMatrix[i][round(owl.x)+2] = MARKER.OWL;
+
     }
   }
 }
 
-async function startDriver(){
-  driver = await new Builder()
-  .forBrowser('chrome')
-  .build();
-  //inicializacion del juego
-  await driver.get('https://www.juegosinfantilespum.com/laberintos-online/12-auto-buhos.php');
-  await driver.wait(until.elementIsNotVisible(driver.findElement(By.id("_preload_div_"))));
-  let canvas = driver.findElement(By.id("canvas"));
-  const actions = driver.actions();
-  await actions.click(canvas).perform();
+async function calculateOrientation(){
+  let dx = currentPos.x - previousPos.x;
+  let dy = currentPos.y - previousPos.y;
+  if(dx > 0) return DIRECTION.RIGHT;
+  else if(dx < 0) return DIRECTION.LEFT;
+  else if (dy > 0) return DIRECTION.DOWN;
+  else if(dy < 0) return DIRECTION.UP;
+  return DIRECTION.DOWN;
+}
+
+async function senseSurroundings(){
+  let senses = [];
+  //check up 
+  if(mapMatrix[currentPos.y-1][currentPos.x] == MARKER.WALL || await isOwlOnPath(DIRECTION.UP))
+    senses.push("UP");
+  //check right
+  if(mapMatrix[currentPos.y][currentPos.x+1] == MARKER.WALL || await isOwlOnPath(DIRECTION.RIGHT))
+    senses.push("RIGHT");
+  //check down
+  if(mapMatrix[currentPos.y+1][currentPos.x] == MARKER.WALL || await isOwlOnPath(DIRECTION.DOWN))
+    senses.push("DOWN");
+  // check left
+  if(mapMatrix[currentPos.y][currentPos.x-1] == MARKER.WALL || await isOwlOnPath(DIRECTION.LEFT))
+    senses.push("LEFT"); 
+  return senses;
+}
+
+async function isOwlOnPath(direction){
+  switch(direction){
+    case DIRECTION.UP:
+      if(isOutOfBounds(currentPos.x-2,currentPos.y))
+        return false;
+      return mapMatrix[currentPos.y][currentPos.x-1] == MARKER.OWL
+    case DIRECTION.RIGHT:
+      if(isOutOfBounds(currentPos.x+2,currentPos.y))
+        return false;
+      return mapMatrix[currentPos.y][currentPos.x+1] == MARKER.OWL
+    case DIRECTION.DOWN:
+      if(isOutOfBounds(currentPos.x,currentPos.y+2))
+        return false;
+      return mapMatrix[currentPos.y+1][currentPos.x] == MARKER.OWL
+    case DIRECTION.LEFT:
+      if(isOutOfBounds(currentPos.x-2,currentPos.y))
+        return false;
+      return mapMatrix[currentPos.y][currentPos.x-1] == MARKER.OWL
+  }
+}
+
+function isOutOfBounds(posX, posY){
+  return posX > WIDTH-1 || posX < 0 || posY > HEIGHT-1 || posY < 0;
+}
+
+//--- THINK ---
+
+async function think(){
+  if(isStuck()){
+    let dx = currentPos.x - agentInfo.car.roundX;
+    let dy = currentPos.y - agentInfo.car.roundY;
+    if(dx >= dy){
+      for(let i = 0; i < Math.abs(dx); i++){
+        let exp = -1;
+        if(dx > 0) exp = 1;  
+        await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.x+=(10*arguments[0]); return},[exp]);
+      }
+  
+      for(let i = 0; i < Math.abs(dy); i++){
+        let exp = -1;
+        if(dy > 0) exp = 1;  
+        await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.y+=(10*arguments[0]); return},[exp]);
+      }
+    } else {
+      for(let i = 0; i < Math.abs(dy); i++){
+        let exp = -1;
+        if(dy > 0) exp = 1;  
+        await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.y+=(10*arguments[0]); return},[exp]);
+      }
+
+      for(let i = 0; i < Math.abs(dx); i++){
+        let exp = -1;
+        if(dx > 0) exp = 1;  
+        await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.x+=(10*arguments[0]); return},[exp]);
+      }
+    }
+  }
+  switch(orientation){
+    case DIRECTION.UP:
+      if(currentSurroundings.includes("UP")){
+        if(currentSurroundings.includes("RIGHT"))orientation = DIRECTION.LEFT;
+        else if(currentSurroundings.includes("LEFT")) orientation = DIRECTION.RIGHT;
+      }else if (currentSurroundings.length == 0){
+        if(previousSurroundings.includes("RIGHT"))
+          orientation =DIRECTION.RIGHT;
+        else if (previousSurroundings.includes("LEFT"))
+          orientation = DIRECTION.LEFT; 
+      }
+      break;
+      case DIRECTION.DOWN:
+        if(currentSurroundings.includes("DOWN")){
+          if(currentSurroundings.includes("RIGHT"))orientation = DIRECTION.LEFT;
+          else orientation = DIRECTION.RIGHT;
+        } else if (currentSurroundings.length == 0){
+          if(previousSurroundings.includes("RIGHT")&& (!previousSurroundings.includes("UP")||!previousSurroundings.includes("LEFT")))
+            orientation =DIRECTION.RIGHT;
+          else if (previousSurroundings.includes("LEFT") && (!previousSurroundings.includes("UP")||!previousSurroundings.includes("RIGHT")))
+            orientation = DIRECTION.LEFT; 
+        }
+        break;
+    case DIRECTION.RIGHT:
+      if(currentSurroundings.includes("RIGHT")){
+        if(currentSurroundings.includes("DOWN"))orientation = DIRECTION.UP;
+        else if(currentSurroundings.includes("UP")) orientation = DIRECTION.DOWN;
+      } else if (currentSurroundings.length == 0){
+        if(previousSurroundings.includes("UP") && (!previousSurroundings.includes("DOWN")||!previousSurroundings.includes("LEFT"))){
+          orientation =DIRECTION.UP;
+        }
+        else if (previousSurroundings.includes("DOWN"))
+          orientation = DIRECTION.DOWN; 
+      }
+      break;
+    case DIRECTION.LEFT:
+      if(currentSurroundings.includes("LEFT")){
+        if(currentSurroundings.includes("DOWN"))orientation = DIRECTION.UP;
+        else if(currentSurroundings.includes("UP")) orientation = DIRECTION.DOWN;
+      } else if (currentSurroundings.length == 0){
+        if(previousSurroundings.includes("UP"))
+          orientation =DIRECTION.UP;
+        else if (previousSurroundings.includes("UP") && (!previousSurroundings.includes("RIGHT")||!previousSurroundings.includes("LEFT")))
+          orientation = DIRECTION.DOWN; 
+      }
+      break;
+  }
+}
+
+function isStuck(){
+  if(Math.abs(agentInfo.car.roundX - currentPos.x) > 2
+  || Math.abs(agentInfo.car.roundY - currentPos.y) > 2)
+    return true;
+  return false;
+}
+
+//--- ACT ---
+
+async function act(){
+  await move(orientation);
+}
+
+async function move(direction, time=5) {
+  mapMatrix[currentPos.y][currentPos.x] = MARKER.EMPTY;
+  switch(direction){
+    case DIRECTION.UP:
+      currentPos.y-=1;
+      mapMatrix[currentPos.y][currentPos.x] = MARKER.CAR;
+      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.y-=10; return});
+      break;
+    case DIRECTION.DOWN:
+      currentPos.y+=1;
+      mapMatrix[currentPos.y][currentPos.x] = MARKER.CAR;
+      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.y+=10; return});
+      break;
+    case DIRECTION.LEFT:
+      currentPos.x-=1;
+      mapMatrix[currentPos.y][currentPos.x] = MARKER.CAR;
+      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.x-=10;return});
+      break;
+    case DIRECTION.RIGHT:
+      currentPos.x+=1;
+      mapMatrix[currentPos.y][currentPos.x] = MARKER.CAR;
+      await driver.executeScript(function(){this.AdobeAn.getComposition("961C296F70897F4AAEF666856D75D3AA").getStage().children[0].personaje.x+=10; return});
+      break;
+  }
 }
