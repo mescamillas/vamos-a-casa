@@ -37,12 +37,13 @@ let driver;
 ;(async function main() {
   try {
     await startGame();
-    while(currentLevel === await getLevel()){
+    while(currentLevel < 3){
       await perceive();
       await think();
       await act();
       printMatrix(mapMatrix, `map${currentLevel}.txt`);
-      break;
+      currentLevel++;
+      //break;
     }
 
 
@@ -69,7 +70,7 @@ async function perceive(){
     await drawStaticElements();
     mapMatrix[agentInfo.car.roundY][agentInfo.car.roundX] = MARKER.CAR;
     console.log(agentInfo.car)
-    isLevelStart = false;
+    //isLevelStart = false;
   }
 }
 
@@ -231,10 +232,12 @@ async function drawStaticElements(){
   mapMatrix[round(agentInfo.houses[currentLevel].y)-1][round(agentInfo.houses[currentLevel].x)-1] = MARKER.HOUSE;
     
   for(let owl of agentInfo.owls[currentLevel]){
-    for(let i = round(owl.y)-2; i <= round(owl.y);i++) {
+    for(let i = round(owl.y)-3; i <= round(owl.y)+1;i++) {
+      mapMatrix[i][round(owl.x)-3] = MARKER.OWL;
       mapMatrix[i][round(owl.x)-2] = MARKER.OWL;
       mapMatrix[i][round(owl.x)-1] = MARKER.OWL;
       mapMatrix[i][round(owl.x)] = MARKER.OWL;
+      mapMatrix[i][round(owl.x)+1] = MARKER.OWL;
     }
   }
 }
